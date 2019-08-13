@@ -1,0 +1,164 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/5.0.0/types.yaml
+  - plugin:cloudify-utilities-plugin
+  - plugin:cloudify-openstack-plugin?version= >=3
+  - plugin:cloudify-aws-plugin
+  - plugin:cloudify-ansible-plugin
+  - plugin:cloudify-kubernetes-plugin
+
+inputs:
+  openstack-external-network:
+    type: string
+    description: >
+      the openstack network name or Id to connect for external management
+    default:  { get_secret: openstack-external-network }
+  centos-image-id:
+    type: string
+    description: >
+     centos image ID on private cloud
+    default:  { get_secret: centos_image_id }
+  centos-flavor-id:
+    type: string
+    description: >
+     centos flavor ID on private cloud
+    default:  { get_secret: centos_flavor_id }
+  keystone-region:
+    type: string
+    description: >
+     openstack region
+    default:  { get_secret: keystone_region}
+  ec2_region_name1:
+    type: string
+    description: >
+     AWS region name
+    default: eu-central-1
+  ec2_region_endpoint1:
+    type: string
+    description: >
+     AWS region endpoint
+    default: eu-central-1
+  ec2_availability_zone1:
+    type: string
+    description: >
+     AWS Availability zone
+    default:  eu-central-1b
+
+  ec2_region_name2:
+    type: string
+    description: >
+     AWS region name
+    default: us-west-2
+  ec2_region_endpoint2:
+    type: string
+    description: >
+     AWS region endpoint
+    default: us-west-2
+  ec2_availability_zone2:
+    type: string
+    description: >
+     AWS Availability zone
+    default:  us-west-2c
+
+node_templates:
+
+  aws-network-1:
+    type: cloudify.nodes.ServiceComponent
+    properties:
+      resource_config:
+        blueprint:
+          external_resource: false
+          id: aws-network-bp
+          blueprint_archive: https://github.com/cloudify-community/blueprint-examples/releases/download/4.5.5-18/aws-example-network.zip
+          main_file_name: blueprint.yaml
+        deployment:
+          id:
+            concat:
+            - "aws-network-"
+            - { get_input: ec2_region_endpoint1 }
+          inputs:
+            region_name: { get_input: [ ec2_region_name1 ] }
+            ec2_region_endpoint: { get_input: [ ec2_region_endpoint1 ] }
+            availability_zone: { get_input: [ ec2_availability_zone1 ] }
+          auto_inc_suffix: false
+
+  aws-network-2:
+    type: cloudify.nodes.ServiceComponent
+    properties:
+      resource_config:
+        blueprint:
+          external_resource: true
+          id: aws-network-bp
+          blueprint_archive: https://github.com/cloudify-community/blueprint-examples/releases/download/4.5.5-18/aws-example-network.zip
+          main_file_name: blueprint.yaml
+        deployment:
+          id:
+            concat:
+            - "aws-network-"
+            - { get_input: ec2_region_endpoint2 }
+          inputs:
+            region_name: { get_input: [ ec2_region_name2 ] }
+            ec2_region_endpoint: { get_input: [ ec2_region_endpoint2 ] }
+            availability_zone: { get_input: [ ec2_availability_zone2 ] }
+          auto_inc_suffix: false
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target:  aws-network-1
+
+
+  openstack-network:
+    type: cloudify.nodes.ServiceComponent
+    properties:
+      resource_config:
+        blueprint:
+          external_resource: false
+          id: openstack-network-bp
+          blueprint_archive: https://github.com/cloudify-community/blueprint-examples/releases/download/4.5.5-18/openstack-example-network.zip
+          main_file_name: blueprint.yaml
+        deployment:
+          id: openstack-network
+          auto_inc_suffix: false
+          inputs:
+            external_network_id: { get_input: [ openstack-external-network ] }
+
+
+capabilities:
+
+  vpc_1:
+    description: VPC IP of endpoint 1
+    value: { get_attribute: [ aws-network-1, vpc, aws_resource_id] }
+
+  public_subnet_id_1:
+    value: { get_attribute: [ aws-network-1, public_subnet, aws_resource_id ] }
+
+  private_subnet_id_1:
+    value: { get_attribute: [ aws-network-1, private_subnet, aws_resource_id ] }
+
+  vpc_2:
+    description: VPC IP of endpoint 2
+    value: { get_attribute: [ aws-network-2, vpc, aws_resource_id] }
+
+  public_subnet_id_2:
+    value: { get_attribute: [ aws-network-2, public_subnet, aws_resource_id ] }
+
+  private_subnet_id_2:
+    value: { get_attribute: [ aws-network-2, private_subnet, aws_resource_id ] }
+
+  openstack_external_network:
+    value: { get_attribute: [ openstack-network, external-network, id ] }
+
+  openstack_public_network_router:
+    value: { get_attribute: [ openstack-network, public-network-router, id ] }
+
+  openstack_public_network:
+    value: { get_attribute: [ openstack-network, public-network, id ] }
+
+  openstack_private_network:
+    value: { get_attribute: [ openstack-network, private-network, id ] }
+
+  openstack_public_subnet:
+    value: { get_attribute: [ openstack-network, public-subnet, id ] }
+
+  openstack_private_subnet:
+    value: { get_attribute: [ openstack-network, private-subnet, id ] }
