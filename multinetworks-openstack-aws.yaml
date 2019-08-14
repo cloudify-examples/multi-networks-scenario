@@ -117,7 +117,7 @@ node_templates:
           blueprint_archive: https://github.com/cloudify-community/blueprint-examples/releases/download/4.5.5-18/openstack-example-network.zip
           main_file_name: blueprint.yaml
         deployment:
-          id: openstack-network
+          id: openstack-network-hub
           auto_inc_suffix: false
           inputs:
             external_network_id: { get_input: [ openstack-external-network ] }
